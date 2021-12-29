@@ -1,0 +1,565 @@
+---
+title: "HW4"
+author: "Nikhil Gopal"
+date: "11/6/2021"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+  word_document: default
+---
+
+**1** 
+
+```{r}
+library(datasets) # Load iris data
+library(ggplot2)
+library(nnet) # For multinomial logistic regression
+library(naivebayes)
+library(adabag) # For AdaBoost
+library(rpart) # For AdaBoost
+library(tidyverse)
+library(ggpubr)
+library(caret)
+library(lmtest)
+```
+
+1a Boxplots, Correlation Matrix, Scatter Plots of Features Pairs:
+
+```{r}
+data <- iris
+
+#Boxplots
+boxplot(data$Sepal.Length, main = "Sepal Length")
+
+boxplot(data$Sepal.Width, main = "Sepal Width")
+
+boxplot(data$Petal.Length, main = "Petal Length")
+
+boxplot(data$Petal.Width, main = "Petal Width")
+
+#boxplot(data$Species)
+
+#Correlation Matrix
+cor(data[1:4])
+
+#scatterplots
+ggplot(iris, aes(x=Sepal.Length, y=Sepal.Width, color = Species)) + geom_point()
+ggplot(iris, aes(x=Sepal.Length, y=Petal.Length, color = Species)) + geom_point()
+ggplot(iris, aes(x=Sepal.Length, y=Petal.Width, color = Species)) + geom_point()
+ggplot(iris, aes(x=Sepal.Width, y=Petal.Length, color = Species)) + geom_point()
+ggplot(iris, aes(x=Sepal.Width, y=Petal.Width, color = Species)) + geom_point()
+ggplot(iris, aes(x=Petal.Length, y=Petal.Width, color = Species)) + geom_point()
+
+```
+
+1b: 
+
+Use X1, X2, X3 to fit the multinomial logistic regression, the Naive Bayes classifier, and
+the AdaBoost with 30 Decision Tree classifiers with maximum depth 3. Plot the decision
+surfaces of the 3 classifiers on (X1, X2) and (X1, X3) respectively.
+
+```{r}
+# Fit a multinomial logistic regression
+multinom_model <- multinom(Species ~ Sepal.Length + Sepal.Width + Petal.Length, data=iris)
+
+# Generate grid points for plotting decision surfaces
+r <- sapply(iris[, c(1,2,3)], range, na.rm = TRUE)
+x1s <- seq(r[1,1], r[2,1], length.out = 500)
+x3s <- seq(r[1,2], r[2,2], length.out = 500)
+x4s <- seq(r[1,3], r[2,3], length.out = 500)
+grid <- cbind(rep(x1s, each=500), rep(x3s, time = 500), rep(x4s, time = 500))
+colnames(grid) <- colnames(r)
+grid <- as.data.frame(grid)
+
+# Predictions from the generated grid points
+multinom_pred <- predict(multinom_model, newdata=grid, type="class")
+
+
+# For Naive Bayes, simply replace the lines for model fitting and prediction with:
+nb_model <- naive_bayes(Species ~ Sepal.Length + Sepal.Width + Petal.Length, data = iris)
+nb_pred <- predict(nb_model, grid, type = "class")
+
+# Plot decision surfaces for (X1, X2)
+mult_ds1 <- ggplot() + 
+  geom_point(data = iris, aes(x=Sepal.Length, y=Sepal.Width, color = Species), size = 2, show.legend = F) +
+  geom_raster(alpha=0.1, aes(x = grid[, 1],y = grid[, 2], fill=multinom_pred), show.legend = F) +
+  theme_bw()
+
+nb_ds1 <- ggplot() + 
+  geom_point(data = iris, aes(x=Sepal.Length, y=Sepal.Width, color = Species), size = 2, show.legend = F) +
+  geom_raster(alpha=0.1, aes(x = grid[, 1],y = grid[, 2], fill=nb_pred), show.legend = F) +
+  theme_bw()
+
+boost_ds1 <- ggplot() + 
+  geom_point(data = iris, aes(x=Sepal.Length, y=Sepal.Width, color = Species), size = 2, show.legend = F) +
+  geom_raster(alpha=0.1, aes(x = grid[, 1],y = grid[, 2], fill=boost_pred), show.legend = F) +
+  theme_bw()
+
+
+
+# For AdaBoost:
+boost_model <- boosting(Species ~ Sepal.Length + Sepal.Width + Petal.Length,
+data = iris, mfinal = 30, control = rpart.control(maxdepth = 3))
+boost_pred <- predict(boost_model, grid, type = "class")$class
+
+
+ggarrange(mult_ds1, nb_ds1, boost_ds1, ncol = 2, nrow = 2)
+```
+**1c:** 
+
+Based on the decision surfaces, compare and summarize the advantage and disadvantage
+of each classifier.
+
+**2a:**
+
+Creating correlated errors through time. Please write a function that takes in an
+integer, n ≥1, then produces “errors” that are generated in the following way:
+
+```{r}
+generate_errors <- function(n){
+  errors <- c()
+  for (i in 1:n) {
+    if(i == 1){
+      errors <- c(errors, rnorm(1, 0, 1))
+    }else{
+      errors <- c(errors, rnorm(1, mean = last(errors), sd = 1))
+    }
+  }
+  return(errors)
+}
+
+```
+
+
+
+**2b**
+
+```{r}
+#generate values
+corr1 <- generate_errors(500)
+rep1 <- rep(1, 500)
+corr2 <- generate_errors(500)
+rep2 <- rep(2, 500)
+corr3 <- generate_errors(500)
+rep3 <- rep(3, 500)
+corr4 <- generate_errors(500)
+rep4 <- rep(4, 500)
+corr5 <- generate_errors(500)
+rep5 <- rep(5, 500)
+
+#create a df
+df <- data_frame(corr1, rep1)
+df2 <- data_frame(corr2, rep2)
+df3 <- data_frame(corr3, rep3)
+df4 <- data_frame(corr4, rep4)
+df5 <- data_frame(corr5, rep5)
+names(df) <- c("cor", "trial")
+names(df2) <- c("cor", "trial")
+names(df3) <- c("cor", "trial")
+names(df4) <- c("cor", "trial")
+names(df5) <- c("cor", "trial")
+
+final_df <- rbind(df, df2, df3, df4, df5)
+final_df$index <- rep(1:2500)
+
+library(RColorBrewer)
+
+#correlated errors plot
+cor_plot <- ggplot(final_df, aes(x=index, y = cor, color = trial)) + geom_point()+ scale_fill_brewer(palette="Dark2")
+
+
+#uncorrelated errors
+uncorr1 <- rnorm(500, 0, 1)
+unrep1 <- rep(1, 500)
+uncorr2 <- rnorm(500, 0, 1)
+unrep2 <- rep(2, 500)
+uncorr3 <- rnorm(500, 0, 1)
+unrep3 <- rep(3, 500)
+uncorr4 <- rnorm(500, 0, 1)
+unrep4 <- rep(4, 500)
+uncorr5 <- rnorm(500, 0, 1)
+unrep5 <- rep(5, 500)
+
+#create df
+df <- data_frame(uncorr1, unrep1)
+df2 <- data_frame(uncorr2, unrep2)
+df3 <- data_frame(uncorr3, unrep3)
+df4 <- data_frame(uncorr4, unrep4)
+df5 <- data_frame(uncorr5, unrep5)
+names(df) <- c("cor", "trial")
+names(df2) <- c("cor", "trial")
+names(df3) <- c("cor", "trial")
+names(df4) <- c("cor", "trial")
+names(df5) <- c("cor", "trial")
+
+uncor_df <- rbind(df, df2, df3, df4, df5)
+uncor_df$index <- rep(1:2500)
+
+#uncorrelated errors plot
+uncor_plot <- ggplot(uncor_df, aes(x=index, y = cor, color = trial)) + geom_point()+ scale_fill_brewer(palette="Dark2")
+
+#show graphs
+cor_plot
+uncor_plot
+
+
+
+rnoise <- function(n) {
+  eps <- vector(length=n)
+  eps[1] <- rnorm(1, 0, 1)
+  for (i in 2:n){
+    #eps[i]<- rnorm(1, eps[i-1], 1)
+    eps[i]<- eps[i-1] + rnorm(1, 0, 1)
+  }
+  return(eps)
+}
+
+
+num_simulation <- 5
+correlated_noise <- replicate(num_simulation, rnoise(n = 500)) 
+independent_noise <- replicate(num_simulation, rnorm(n = 500))
+
+par(mfrow=c(1,2))
+matplot(correlated_noise, type="l", lty = 1, pch=19, ylab="noise", xlab="n", main="Correlated")
+matplot(independent_noise, type="l", lty = 1, pch=19, ylab="noise", xlab="n", main="Independent")
+```
+
+
+**2c**
+
+Comment on the difference. According to the plots you’ve created, please answer
+the following:
+
+Do both types of errors have mean 0 overall (1 sentence)? What could you do to be
+more certain (1 sentence)?
+
+The uncorrelated errors do have mean 0 overall, while the uncorrelated errors definitely do not. We could calculate the average column values in the dataframe and get this information quickly.
+
+Uncorrelated:
+```{r}
+mean(uncor_df$cor)
+```
+Correlated:
+
+```{r}
+mean(final_df$cor)
+```
+
+We see that the correlated has a mean of 1.39 (across each group) and that the uncorrelated errors have a near zero mean of -0.001236516.
+
+Which type of errors has a larger variance or are they comparable?
+
+```{r}
+var(final_df$cor)
+var(uncor_df$cor)
+```
+
+The correlated errors have a variance of 477.7241 while the uncorrelated errors have a variance of 1.003073. This makes sense as the uncorrelated errors are normally distributed and should have a standard deviation of about 1, and the standard deviation is the square root of the variance.
+
+The uncorrelated errors definitely have a higher variance.
+
+**2d**
+
+How correlated errors affect the ordinary least squared regression. Please
+simulate data from the usual linear model Yi = β0 + β1xi + ϵi, but now ϵi are generated
+from your correlated function as in part (a). Let x1, x2, . . . , xn be evenly spaced values
+between 0 and 10 in increments of 0.2 (inclusive of bounds). Set β0 = 1, β1 = 2. At each
+value of xi, we only observe one yi. For each dataset generated, please fit the OLS and
+store:
+• the fitted parameters;
+• the associated mean and SE for the parameters in the output of summary.lm().
+Please create 1000 simulated datasets and estimate the mean and SE of the regression
+coefficients. Do the mean and SE based on the simulated values “overall agree” with the
+values from summary.lm()? Please explain your answer. (Hint: Please refer to the
+R Hints.)
+
+
+```{r}
+generate_regression <- function(beta) {
+X <- cbind(1, seq(0, 10, by = 0.2))
+# You should write your own rnoise() for generating correlated errors in part (a)
+Y <- X %*% beta + generate_errors(nrow(X))
+return( lm(Y ~ X[,2]) ) # Return an object
+}
+
+regressions <- replicate(1000, generate_regression(c(1,2)), simplify = FALSE)
+# First row will be intercept and the second row will be slope.
+fitted_parameters <- sapply(regressions, coef)
+computed_mean <- sapply(regressions, function(obj) summary(obj)$coefficients[,"Estimate"])
+computed_se <- sapply(regressions, function(obj) summary(obj)$coefficients[,"Std. Error"])
+estimated_mean <- apply(fitted_parameters, 1, mean)
+estimated_se <- apply(fitted_parameters, 1, sd)
+
+```
+
+
+
+**2e**
+
+Which of our usual regression conditions are satisfied in our simulation above? Please
+also state why the conditions are violated:
+
+
+Linearity is not violated, because this is how the data was generated. As shown in the math above, the errors have 0 conditional expectation. Since we used the rnorm() function to generate the data, the errors are normally distributed. However, crucially the errors are not indendent. They are dependent, as the previous error is used to calculate the next error, as shown in the code above. The errors do not have a constant variance, violating the homoscedasticity assumption. As the sample size increases, the errors also increase, as shown above.
+
+
+**Project Question Series 3**
+
+
+Formulate a statistical inference problem that will help your instructor to predict the travel
+time of future trips.:
+
+
+
+Propose a detailed analytical pipeline to solve the statistical inference problem:
+
+Design the experiment to evaluate the effectiveness of your approach:
+
+```{r}
+
+flights <- read.csv("pnwflights14.csv")
+
+# Remove NAs
+flights <- na.omit(flights)
+
+# Remove nonsense entries 
+flights <- flights[-which(flights$dep_time < 0),]
+flights <- flights[-which(flights$air_time < 0),]
+flights <- flights[-which(flights$distance < 0),]
+
+
+
+
+#convert the timing into a date time object
+flights$date <- paste(flights$year, "-", flights$month, "-", flights$day, " ", flights$hour, ":", flights$minute, sep = "")
+
+flights$dep_date <- strptime(flights$date, format="%Y-%m-%d %H:%M")
+
+flights2 <- flights
+
+
+flights2$arr_time2 <- substr(as.POSIXct(sprintf("%04.0f", flights$arr_time), format='%H%M'), 12, 16)
+
+flights2$arr_date <- paste(flights$year, "-", flights$month, "-", flights$day, " ", flights2$arr_time2, sep = "")
+
+flights2$arr_date <- strptime(flights2$arr_date, format="%Y-%m-%d %H:%M")
+
+flights$arr_date <- flights2$arr_date
+
+
+```
+
+Formulate a statistical inference problem that will help your instructor to predict the travel
+time of future trips.:
+
+
+```{r}
+avg_carrier_delays <- flights %>%
+  group_by(carrier) %>%
+  summarise(mean_delay= mean(arr_delay), n = n()) %>%
+  arrange(desc(mean_delay))
+
+avg_carrier_delays
+```
+
+
+The goal of this problem is to predict the travel time of a future trip. Above I calculated the mean arrival delay between flight carriers. I want to see if there is a true difference in the mean arrival delay between the carrier with the lowest arrival delay and the carrier with the highest arrival delay. This will be useful in determining which carrier is the best to pick to minimize arrival delays.
+
+Propose a detailed analytical pipeline to solve the statistical inference problem:
+
+To evaluate if one carrier is better than another carrier, I will conduct a difference in means test. I will then also create a simple linear regression model, to see if other variables better explain the difference in arrival time than carrier.
+
+Design the experiment to evaluate the effectiveness of your approach:
+
+Pre processing:
+```{r}
+
+flights <- read.csv("/Users/nikhil/Google Drive/My Drive/STAT 3105/HW4/pnwflights14.csv", header = TRUE)
+
+# Remove NAs
+flights <- na.omit(flights)
+
+# Remove nonsense entries 
+flights <- flights[-which(flights$dep_time < 0),]
+flights <- flights[-which(flights$air_time < 0),]
+flights <- flights[-which(flights$distance < 0),]
+
+
+#convert the timing into a date time object
+flights$date <- paste(flights$year, "-", flights$month, "-", flights$day, " ", flights$hour, ":", flights$minute, sep = "")
+
+flights$dep_date <- strptime(flights$date, format="%Y-%m-%d %H:%M")
+
+flights2 <- flights
+
+
+flights2$arr_time2 <- substr(as.POSIXct(sprintf("%04.0f", flights$arr_time), format='%H%M'), 12, 16)
+
+flights2$arr_date <- paste(flights$year, "-", flights$month, "-", flights$day, " ", flights2$arr_time2, sep = "")
+
+flights2$arr_date <- strptime(flights2$arr_date, format="%Y-%m-%d %H:%M")
+flights$arr_date <- flights2$arr_date
+
+#recode categorical vars
+flights$month <- as.factor(flights$month)
+flights$year <- as.factor(flights$year)
+flights$day <- as.factor(flights$day)
+
+#There are 3007 tail nos and 145459 observations, so likely corresponds to type of aircraft
+flights$tailnum <- as.factor(flights$tailnum)
+flights$origin <- as.factor(flights$origin)
+flights$dest <- as.factor(flights$dest)
+flights$flight <- as.factor(flights$flight)
+```
+
+
+**Regression**
+
+Now we will do some exploratory analysis, and make a simple model and try to identify useful features.
+
+```{r}
+plot(flights$arr_date, flights$arr_delay, main = "Arrival Date vs Arrival Delay")
+plot(flights$dep_date, flights$arr_delay, main = "Departure Date vs Arrival Delay")
+
+#These variables are highly correlated
+plot(flights$dep_delay, flights$arr_delay)
+
+#try and look for collinearity
+
+flights2 <- select(flights, dep_delay, arr_time, arr_delay, air_time, distance)
+
+cor(flights2) 
+
+```
+
+
+From our correlation matrix, we notice a high degree of correlation between arr_delay and dep_delay, as well as between distance and air_time. We will need to keep this in mind when designing our model, as collinearity violates the assumptions of linear regression.
+
+Now we will remove unnecessary/duplicate features make a simple OLS model, and then evaluate it's predictive accuracy:
+
+```{r}
+flights2 <- select(flights, -c(month, day, year, date))
+
+
+flights2$dep_date <- as.Date(flights2$dep_date)
+
+#Test/Train Split
+trainIndex <- createDataPartition(flights2$arr_delay, p = .8, 
+                                  list = FALSE, 
+                                  times = 1)
+train <- flights2[trainIndex,]
+test <- flights2[-trainIndex,]
+```
+
+
+```{r}
+#simple regressions
+simple1 <- lm(arr_delay ~ air_time, data = train)
+simple1_predict <- predict(simple1, test)
+RMSE(simple1_predict, test$arr_delay)
+
+
+```
+RMSE = 31.3
+
+```{r}
+simple2 <- lm(arr_delay ~ air_time+carrier+origin+distance+dest+dep_date, data = train)
+simple2_predict <- predict(simple2, test)
+RMSE(simple2_predict, test$arr_delay)
+```
+RMSE = 30.28
+
+
+```{r}
+# Define training control
+set.seed(123) 
+train.control <- trainControl(method = "cv", number = 10)
+
+# Train the model
+model <- train(arr_delay ~ air_time+carrier+origin+distance+dest+dep_date,data = flights2, method = "lm",trControl = train.control)
+
+#RMSE = 29.88867
+print(model)
+```
+
+```{r, eval=FALSE}
+
+simple1 <- lm(arr_delay ~ air_time, data = flights2)
+simple2 <- lm(arr_delay ~ air_time+carrier+origin+distance+dest+dep_date, data = flights2)
+simple3 <- lm(arr_delay ~ origin+dest+carrier+distance+dep_delay, data = flights2)
+simple4 <- lm(arr_delay ~ origin+dest+carrier+distance+dep_delay+dep_date, data = flights2)
+simple5 <- lm(arr_delay ~ origin+carrier+distance+dep_delay+dep_date, data = flights2)
+
+
+summary(simple1)
+summary(simple2)
+summary(simple3)
+```
+
+```{r}
+simple2_predict <- predict(simple2, test)
+RMSE(simple2_predict, test$arr_delay)
+summary(simple2)
+lrtest(simple1, simple2)
+```
+
+```{r}
+plot(simple2)
+```
+
+
+For this problem, I originally thought of using machine learning methods, as I thought that these would be able to make models with very high predictive accuracy. Interestingly I noticed that the model that I settled on had an RMSE of 30.028, whereas my best machine learning model using a 10 k fold split was only able to achieve an RMSE of 29.8. 
+
+This lead me to think about the problem in a new way, as the goal of this problem is statistical inference, and thus making a model that fits well is more important than making a model that predicts well. I eventually decided to use OLS as it would be easy to interpret, and I used variables that were likely to have an effect on arrival delay. I avoided using both air_time and distance, as these variables are highly correlated, and I did not want to violate the collinearity assumption.
+
+I chose to fit an OLS regression on arr_delay, with the following variables as predictors: origin,dest,carrier,distance,dep_delay,dep_date. This model achieved an R^2 of 0.86, which is much higher than my simplest model's R^2 of 0.081. Relative to my simplest model, we can also confirm using the likelihood ratio test that my model fits the data better (p < 0.0001).
+
+From the cook's vs distance plot, we can see that there are very few influential values, and from the Normal Q-Q plot, we can verify the normality assumption. Most of the variables in this model were statistical significant, with the exception of a few carriers and origin/destination airports. 
+
+What this model shows us, is that for this dataset, there exists a relationship between the predictors and arrival delay, and approximately 87% of the variability in the data can be explained by the model.
+
+
+**Difference in Means Test**
+
+```{r}
+df <- subset(flights, carrier == "F9" | carrier == "US")
+
+df <- select(df, carrier, arr_delay)
+
+hist(df$arr_delay[df$carrier == "F9"], main = "Distribution of F9 Carrier Arrival Delay",
+     xlim = range(0:200), xlab = "Arrival Delay (minutes)")
+
+hist(df$arr_delay[df$carrier == "US"], main = "Distribution of US Carrier Arrival Delay",
+     xlim = range(0:200), xlab = "Arrival Delay (minutes)")
+
+
+
+```
+
+The conditions for conducting a difference in means test are that the samples are obtained randomly. I am not completely sure where this data came from but I will assume for now that the samples are obtained randomly.
+
+Since each row represents a different flight, it is fair to assume that samples are independent, and that one flight does not affect another. In any case where it would like a certain accident on the runway causing delays of other flights, this variability will be mitigated by random sampling.
+
+The histograms above do not appear to depict the sampling distribution as normal. However, since the sample size is greater than 40 for both airlines, we can meet the normality assumption.
+
+
+```{r}
+t.test(arr_delay ~ carrier, data = df)
+```
+Our t test returned a p value of < 2.2e-16 for the null hypothesis that the true difference in means is equal to zero. Sample sizes were significantly large with 2411 F9 flights and 5319 US flights. This means that we can reject the null hypothesis, and confirm that the true difference in means is not zero. A 95% confidence interval for the true difference in means was [8.730665, 12.355621] and zero is notably not in the confidence interval.
+
+
+**Conclusion**
+
+Our regression model provided a coefficient of 5.669208 for having F9 as carrier and a coefficient of -4.472456 for having US as a carrier, and both coefficients were statistically. Our difference in means test showed that there is definitely a difference in the mean flight time between F9 and US. If trying to make a decision solely based on airline, the professor should definitely pick US airlines, as they are statistically likely to be early compared to other airlines. 
+
+However the following histogram shows the distribution of all of the regression coefficients:
+
+```{r}
+hist(coef(simple2), xlab = "coefficient value", main = "Distribution of Regression coefficients")
+```
+
+From observing the distribution, we observe that 5.6 and -4.4 appear to be relatively in the center, meaning that they do not have as big of an effect on arrival time as other variables in the model. While it is likely to be the case that picking US airlines would decrease the flight time, other variables are likely to have a higher chance at decreasing flight time. For example, having Cleavland as a destination has a coefficient of 40, and is much more likely to increase flight time. Additionally, having LMT as a destination has a coefficient of -28 and is much more likely to decrease flight time.
+
+

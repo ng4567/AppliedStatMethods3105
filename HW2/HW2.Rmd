@@ -1,0 +1,469 @@
+---
+title: "HW2"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+**From HW 1:**
+
+```{r}
+
+#setwd("G:/My Drive/STAT 3105")
+
+library(jsonlite)
+library(dplyr)
+
+#process data
+data <- fromJSON("unemployment_cpi_unempl_2000_2020.json")
+df <- as.data.frame(bind_rows(data$Results))
+a <- data.frame(df$data[1])
+b <- data.frame(df$data[2])
+
+#remove unnecessary columns
+a <- subset(a, select = -footnotes)
+b <- subset(b, select = -footnotes)
+
+#reassign 1st/2nd half status to each month
+a$period[a$period=="M12" | a$period == "M11" | a$period == "M10" | a$period == "M09" | a$period == "M08"| a$period == "M07"] <- "2nd Half"
+
+a$period[a$period=="M06" | a$period == "M05" | a$period == "M04" | a$period == "M03" | a$period == "M02"| a$period == "M01"] <- "1st Half"
+
+#change type of column from char to double
+a$value = as.double(a$value)
+
+#obtain average unemployment per period for first part
+first_part <- a %>%
+  group_by(year, period) %>%
+  summarise(mean(value))
+
+names(first_part) <- c("year", "period", "unemployment")
+
+#change type of column from char to double
+b$value = as.double(b$value)
+
+#obtain average CPI per period for 2nd part
+second_part <- b %>% 
+  group_by(year, periodName) %>%
+  summarise(mean(value))
+names(second_part) <- c("year", "period", "cpi")
+
+```
+
+
+*Add CPI and Export to CSV:
+
+```{r}
+
+
+#add CPI to df
+
+first_part$cpi <- second_part$cpi
+df <- first_part
+
+#export to csv
+write.csv("CPI.csv")
+
+#calculate inflation
+df$inflation <- rep(1:20)
+
+#convert to dataframe
+df <- as.data.frame(df)
+
+inflation <- rep(1:20)
+
+counter = 1
+for(index in df$cpi){
+   if(counter == 1) {
+    inflation[counter] <- NA
+    counter = counter + 1
+  }
+  inflation[counter] <- (df$cpi[counter] - df$cpi[counter - 1])/df$cpi[counter -1] * 100
+  counter = counter + 1
+}
+
+#remove last NA
+inflation <- inflation[1:20]
+
+#add column to df
+df$inflation <- inflation
+
+
+```
+
+Graph:
+
+```{r}
+
+
+
+```
+
+**Problem 1** 
+
+**1a**
+
+```{r}
+
+mod <- lm(df$inflation ~ df$unemployment)
+
+summary(mod)
+
+#scatter plot inflation vs unemployment
+plot(df$unemployment, df$inflation,
+     main = "Scatter Plot Inflation vs Unemployment", xlab = "Unemployment Rate (Percentage)",
+     ylab = "Inflation Rate (Percentage)")
+abline(lm(df$inflation ~ df$unemployment), col = "red")
+
+```
+
+This model gave a slope for inflation of -0.3102 with a p value of 0.0436. The p value represents the probability that the null hypothesis that there is no relationship between the variables is true. Since the p value is very low (0.05 > 0.0436), we can be confident that there is likely a relationship, and that the coefficient is not zero. The slope being negative tells us that inflation decreases slightly as unemployment increases, that is for every 1 percentage increase in unemployment, inflation decreases by -0.31%.
+
+**1b**
+
+#From lecture 5 slides
+
+We assume that there is a large enough sample size, and that the errors in our data are normally distributed.
+
+**1c**
+
+```{r}
+
+
+#remove first row so that vectors are equal lengths
+cor_df <- df[-1,]
+
+#calulate correlation between 2 variables
+cor <- cor(cor_df$unemployment, cor_df$inflation)
+
+cor
+
+## Permutation Test
+M <- 1000
+cor_list <- c()
+
+for(i in 1:M){
+  idx_permute <- sample(1:length(cor_df$unemployment), size = length(cor_df$unemployment), replace = F)
+  x_permute <- cor_df$unemployment[idx_permute]
+  cor_permute <- cor(x_permute, cor_df$inflation)
+  cor_list <- c(cor_list, cor_permute)
+}
+hist(cor_list, probability = T, xlim = c(-1, 1))
+abline(v = cor(cor_df$unemployment, cor_df$inflation), col = "red")
+
+```
+
+The correlation between the two variables was -0.4674133.
+
+If there variables were independent, the correlation would be close to 0.0 on the histogram (indicating no correlation when the variables were shuffled). This did not appear to be the case, as we had correlations from -0.9 to 0.5. This is in line with our correlation of -0.46, and means that there is likely a relationship between the variables.
+
+
+
+**2a:**
+
+```{r}
+library(dplyr)
+library(jsonlite)
+
+#read JSON
+data <- read_json("nytimes_2020_articles_with_comments.json", simplifyVector = TRUE)
+
+```
+
+This data is of comments on 2020 NYT articles. Each list represents a different article, with the each of rows in each of the 1406 lists representing a different comment. We are given a userID number, the user's username, the content of their comments, the date when the comment was last updated, the date it was approved, how many times it was recommended, how many times it was replied to, a binary variable indicating weather the comment was featured in the editor section and finally another binary variable indicating weather the comment was posted anonymously.
+
+**2b:**
+
+```{r}
+
+#create variables to represent maximum length and URL, for foor loop later
+max_length <- 0
+name <- ""
+
+
+#iterate through JSON, find the article with the highest number of replies
+for(i in 1:length(data)){
+  url <- as.character(names(data[i]))
+  length <- length(data[[i]][[2]])
+  
+  if(length > max_length){
+    max_length <- length
+    name <- url
+    }
+}
+
+print(paste("Article: ",name, " Length: ", max_length, sep = ""))
+
+```
+
+The article with the most comments is found at the link: nyt://article/a6546112-4515-5f3d-8b38-77c3f65d526d . It had 4400 replies.
+
+
+
+**2c**
+
+```{r}
+#turn object into a DF
+df <- as.data.frame(bind_rows(data))
+
+
+#add a URL column to the DF to represent which article a given article was pulled from
+
+#create new list
+articles <- c()
+
+#iterate through the JSON object. Get the URL, figure out how many times that article appears (length), add it to a vector that will be used as a column value later
+for (i in 1:length(data)){
+  url <- as.character(names(data[i]))
+  length <- length(data[[i]][[2]])
+  article <- rep(url, length)
+  articles <- append(articles, article)
+}
+
+df$url <- articles
+
+
+#create a new column for word count and unique words
+df$WordCount <- NA
+df$Num.Unique.Words <- NA
+
+
+#iterate through DF, split string and turn the result into a list (each word is an index). Add number of words and unique words
+
+for(i in 1:length(df$commentBody)){
+  
+  c <- unlist(strsplit(df$commentBody[i], split = "\\s+"))
+  
+  df$WordCount[i] <- length(c)
+  df$Num.Unique.Words[i] <- length(unique(c))
+}
+
+#rank updates
+
+#convert the UpdateDate column to a DateTime object
+library(lubridate)
+df$Date <- df$updateDate %>% as.integer() %>% as_datetime()
+
+#create rankings for the dates
+df <- df %>%
+  group_by(url) %>%
+  mutate(time_rank = rank(Date, ties.method = "first"))
+  
+#display first few rows of DF
+head(df)
+```
+
+
+I used the head function above to display the first few rows of the data frame for your review.
+
+
+**2d**
+
+```{r}
+
+#Filter DF to only include March Articles
+march <- df %>% 
+  filter(Date > as.Date("2020-03-01 00:00:00") & Date < as.Date("2020-04-01 00:00:00"))
+
+#Get number of March Articles
+length(unique(march$url))
+
+#dimensions of df
+dim(march)
+```
+
+There are about 1222 unique articles for March 2020 in this dataset. Using the dims function, we can see that there are 346290 comments that pertain to March 2020 in this dataset. This dataset likely contains a representative sample of comments on articles on March 2020 NYT articles, as 1222 articles is a decent sample size. 
+
+According to the piazza, this dataset actually represents the entire population of NYT articles from this time period. This makes it an actual perfect representation of the population of interest.
+
+**Project Question Series 1**
+
+**1**
+
+I would like to have a data set, perhaps provided by US air traffic control, that lists  flight numbers, and their scheduled arrival and departure times, as well as their actual arrival and departure times. For me, the usual cause of flight delays is weather, so I would like to combine this dataset with a dataset that gives information on historical weather. Maybe I could code a categorical variable for the weather to represent how unfavorable the weather conditions were in the hour prior to takeoff/landing (mild, bad, really bad, hurricane).
+
+The Bureau of Transportation Statistics publishes this data on the internet (https://transtats.bts.gov/ONTIME/)
+
+**2**
+ 
+One potential issue that I might face is that during the COVID-19 pandemic, many governments decided to spontaneously cancel international travel to prevent the spread of the virus. Thus, flights from February-April 2020 might be more likely to be cancelled, which will affect the results, and make it look like flights are more likely to be cancelled than they otherwise would be, as there were a significant amount of flight cancellations (which would obviously result on the flights not arriving on time). I would thus exclude data from these months.1
+
+**Dataset**
+
+**How many columns are in the dataset? What does each column stand for? ** 
+
+```{r}
+
+flights <- read.csv("pnwflights14.csv")
+
+dim(flights)
+
+colnames(flights)
+```
+
+There are 16 columns in the data. The columns give information including when the flights departed and arrived, when they were scheduled to depart/arrive, how long any delays were, flight number, origin/destination airport, air time and flight distance.
+
+**How many airlines are in the dataset? Please aggregate the number of flights per month
+and visualize this with clear labels**
+
+```{r}
+
+length(unique(flights$carrier))
+
+
+#number of flights per month
+flights %>% group_by(month) %>%
+  summarise(n = n())
+
+
+library(ggplot2)
+
+#Bar Graph of # of flights per month
+ggplot(data = flights, aes(x=month)) +
+  geom_bar(color = "blue", fill = "light blue") +
+  geom_text(stat='count', aes(label=..count..), vjust=-1)
+
+  
+```
+
+There are 11 airlines in the dataset. 
+
+Above I have included a graph with the number of flights per month. All of the data is from 2014, there was nothing in the dataset in any other year.
+
+
+**What data quality issues have you noticed? What results will be impacted by these
+issues?**
+
+Departure time has negative values, which shouldn't be possible. The values should be between 00:00 and 24:00. There must have been some error in the data collection.
+
+Distance and air time also have negative values.
+
+Additionally, some columns have certain values as NA or with no data.
+
+**Do certain airlines departure/arrive late their flights more often than others? **
+
+```{r}
+
+#convert the timing into a date time object
+flights$date <- paste(flights$year, "-", flights$month, "-", flights$day, " ", flights$hour, ":", flights$minute, sep = "")
+
+flights$dep_date <- strptime(flights$date, format="%Y-%m-%d %H:%M")
+
+flights2 <- flights
+
+
+flights2$arr_time2 <- substr(as.POSIXct(sprintf("%04.0f", flights$arr_time), format='%H%M'), 12, 16)
+
+flights2$arr_date <- paste(flights$year, "-", flights$month, "-", flights$day, " ", flights2$arr_time2, sep = "")
+
+flights2$arr_date <- strptime(flights2$arr_date, format="%Y-%m-%d %H:%M")
+
+flights$arr_date <- flights2$arr_date
+
+
+
+
+```
+
+
+
+```{r}
+
+#number of flights per month
+
+avg_delay <- flights %>% group_by(carrier) %>%
+  summarise(avg_delay = mean(arr_delay, na.rm = TRUE), avg_dep_delay = mean(dep_delay, na.rm = TRUE), avg_arr_delay = mean(arr_delay, na.rm = TRUE))
+
+
+carriers <- unique(flights$carrier)
+
+
+
+barplot(height = avg_delay$avg_arr_delay, names.arg = avg_delay$carrier, data = avg_delay, main = "Average Arrival Delay by Flight Carrier", xlab = "Carrier", ylab = "Average Delay (Mins)")
+
+
+barplot(height = avg_delay$avg_dep_delay, names.arg = avg_delay$carrier, data = avg_delay, main = "Average Departure Delay by Flight Carrier", xlab = "Carrier", ylab = "Average Delay (Mins)")
+
+
+```
+
+
+As shown by the bar plot, certain airlines do tend to have longer cartain departure delays than others. In particular, F9 has the longest arrival delays (9 min), while US appears to leave 2 minutes early on average. For departure delays, WN has the highest average delay (12 mins) while HA has the lowest (3)
+
+**Are the arrival delays independent of the destination airport? How would you test this idea?**
+
+
+```{r}
+
+simple_delay_mod <- lm(arr_delay~as.factor(dest),data = flights)
+
+flights_useful <- subset(flights, select = c(origin, dest, distance, air_time, arr_delay))
+
+complex_mod <- lm(arr_delay ~. , data = flights_useful)
+
+summary(simple_delay_mod)
+
+summary(complex_mod)
+```
+
+
+To test weather or not arrival delay was independent of destination airport, I regressed it onto destination airport and also conducted a hypothesis test for slope (ANOVA). This is reported in the summary above. It appears that there is a statistically significant relationship between certain destination airports and arrival time, but not all airports. 
+
+I also made another model that included origin station, distance traveled, and airtime. Origin appeared to be a significant factor with a relatively large coefficient of 6.082, and airtime appeared to have a small effect (both statistically significant). Like the previous model, this model  also has certain destination airports as having statistically significant coefficients, and some that do not.
+
+Thus, we can be confident that arrival delays are not entirely independent of airport, but it also depends which airport the aircraft is arriving to, as we cannot be sure that the coefficient is not zero for all destination airports.
+
+
+```{r}
+
+anova(simple_delay_mod)
+
+```
+The p value of our anova test was less than 0.05. Thus, we can be sure that the slopes of at least some of the coefficients in our model are not zero, meaning there exists a relationship between the variables.
+
+**Is there a cyclical pattern to the arrival time? Please use a graph and a paragraph to justify your answer. **
+
+*Plot arrival time against arrival delay
+
+```{r}
+
+
+plot(flights$dep_date, flights$arr_delay, xlab = "Date", ylab = "Arrival Delay (Mins)", main = "Flight Departure Date vs Arrival Delay")
+
+
+#Plot arrival delay vs arrival time
+plot(flights$arr_date, flights$arr_delay, xlab = "Date", ylab = "Arrival Delay (Mins)", main = "Flight Arrival Date vs Arrival Delay")
+
+
+
+
+```
+
+The plot above shows a scatterplot of flight date vs arrival delay. Any patterns would be lose and relatively undefined, but there could be a slight increase in flight delays towards the begining of each month, with a decrease in delay as the month goes on. This explains the sort of peaks and then dips in the graph. These patterns are slight though. Mostly, it appears that arrival times are constant over time.
+
+
+**Are arrival delays the same across airlines (i.e. carriers)?**
+
+```{r}
+
+
+summary(aov(arr_delay ~ carrier, data = flights))
+
+      
+```
+
+To determine weather there was a real difference in means between groups, I ran a one-way anova test, which provided an F statistic of 136 and a p value of almost 0. Since the p value is less than 0.05, we can confidently say with statistical significance that there is a difference in the mean arrival delay between carriers in this dataset.
+
+**2**
+
+I explained above the data quality to issues. To fix this, I will assume the negative distance, airtime and departure time values were entered in error, and should be positive. Fixing missing data and NA values is not possible:
+
+```{r}
+flights$distance <- abs(flights$distance)
+flights$air_time <- abs(flights$air_time)
+flights$dep_time <- abs(flights$air_time)
+```
+
+
+

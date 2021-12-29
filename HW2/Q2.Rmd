@@ -1,0 +1,61 @@
+---
+title: "Q2"
+output: pdf_document
+---
+
+**2a:**
+
+```{r}
+library(dplyr)
+library(jsonlite)
+
+#read JSON
+dataa <- read_json("/Volumes/GoogleDrive/My Drive/STAT 3105/HW2/nytimes_2020_articles_with_comments.json", simplifyVector = TRUE)
+
+```
+
+This data is of comments on 2020 NYT articles. Each list represents a different article, with the each of rows in each of the 1406 lists representing a different comment. We are given a userID number, the user's username, the content of their comments, the date when the comment was last updated, the date it was approved, how many times it was recommended, how many times it was replied to, a binary variable indicating weather the comment was featured in the editor section and finally another binary variable indicating weather the comment was posted anonymously.
+
+**2b:**
+
+```{r}
+
+#create variables to represent maximum length and URL, for foor loop later
+max_length <- 0
+name <- ""
+
+#iterate through JSON, find the article with the highest number of replies
+for(i in 1:length(dataa)){
+  url <- as.character(names(dataa[i]))
+  length <- length(a[[i]][[2]])
+  
+  if(length > max_length){
+    max_length <- length
+    name <- url
+    }
+}
+
+print(paste("Article: ",name, " Length: ", max_length, sep = ""))
+
+```
+
+The article with the most comments is found at the link: nyt://article/a6546112-4515-5f3d-8b38-77c3f65d526d . It was 4400 replies.
+
+
+
+**2c**
+
+```{r}
+#turn object into a DF
+dffff <- as.data.frame(bind_rows(dataa))
+
+#create a new column for word count
+dffff$WordCount <- NA
+
+for(i in 1:length(dffff$commentBody)){
+  dffff$WordCount[i] <- lengths(strsplit(dffff$commentBody[i], "\\W+"))
+}
+
+
+
+```

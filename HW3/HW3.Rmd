@@ -1,0 +1,285 @@
+---
+title: "HW3"
+author: "Nikhil Gopal"
+date: "10/25/2021"
+---
+
+
+```{r}
+rm(list = ls())
+library(raster)
+library(glmnet)
+library(dplyr)
+setwd("G:/My Drive/STAT 3105/HW3/")
+```
+
+**1a Does one/none/both of the cost functions encourage sparse estimates? If so, which one? Explain your answer.**
+
+The q = 0.5 cost function encourages sparce estimates. Relative to the other function, this function provides $l_i$ that are closer to the origin on average. From looking at the constraint regions for the parameters, we know that the 0.5 function would encourage sparce estimates.  
+
+**1b Which of the points x1, . . . , x5 would achieve the smallest cost under the `q-constrained least squares cost function? For each of the two cases, name the respective point and give a brief explanation for your answer. **
+
+For q = 0.5, beta becomes zero when the line intersects the beta1 axis, which occurs at point x3. 
+
+For q = 4, beta becomes zero when the line intersects the ellipse, which occurs at point x4.
+
+**1c Write down the loss function with q = 0.5 and q = 4 respectively. Which one do you think is easier to solve numerically and why?** 
+
+Loss q = 4:
+
+$$\mathcal{L}_{\lambda, 4} = \sum_{i = 1}^n (y_i - \sum_{j = 1}^2 x_j\beta_j)^2 + \lambda (\sum_{i = 1}^2 |\beta_i|^{4})^{\frac{1}{4}}$$
+Loss q = 0.5:
+
+$$\mathcal{L}_{\lambda, 0.5} = \sum_{i = 1}^n (y_i - \sum_{j = 1}^2 x_j\beta_j)^2 + \lambda (\sum_{i = 1}^2 |\beta_i|^{0.5})^{\frac{1}{0.5}}$$
+
+
+The convex function (q = 4) would be easier to solve. As shown on the diagrams in the lecture, local minimums are global minimums for convex functions, whereas with nonconvex functions, one cannot be sure that a local minimum is a global minimum. Thus, finding one local minimum is sufficient to solve a convex loss function, making it easier to solve overall.
+
+**2a Using the 5 penalty values of  λ mentioned above to fit the ridge regression model. You will have the coefficient  β ∈ R16384. Reshape β into 128 × 128 matrix, and plot the matrix as in the original image. Which coefficient yields the best result?**
+
+
+```{r}
+X_mat <- as.matrix(read.table(file = "hw3_Q2_X.txt"))
+
+Y_lst <- as.matrix(read.table("hw3_Q2_Y.txt"))
+
+# Ridge Regression (alpha = 0)
+ridge_reg1 <- glmnet(X_mat, Y_lst, family = "gaussian", intercept = T,
+alpha=0, lambda = 0.000001, lambda.min.ratio = 1e-8,
+standardize = F, nlambda = 1)
+
+ridge_reg2 <- glmnet(X_mat, Y_lst, family = "gaussian", intercept = T,
+alpha=0, lambda = 0.0001, lambda.min.ratio = 1e-8,
+standardize = F, nlambda = 1)
+
+ridge_reg3 <- glmnet(X_mat, Y_lst, family = "gaussian", intercept = T,
+alpha=0, lambda = 0.01, lambda.min.ratio = 1e-8,
+standardize = F, nlambda = 1)
+
+ridge_reg4 <- glmnet(X_mat, Y_lst, family = "gaussian", intercept = T,
+alpha=0, lambda = 0.1, lambda.min.ratio = 1e-8,
+standardize = F, nlambda = 1)
+
+ridge_reg5 <- glmnet(X_mat, Y_lst, family = "gaussian", intercept = T,
+alpha=0, lambda = 1, lambda.min.ratio = 1e-8,
+standardize = F, nlambda = 1)
+
+# Reshape Ridge Coefficients to a 128x128 matrix
+beta_mat6 <- matrix(ridge_reg1$beta[,1], nrow=128, byrow=T)
+beta_mat7 <- matrix(ridge_reg2$beta[,1], nrow=128, byrow=T)
+beta_mat8 <- matrix(ridge_reg3$beta[,1], nrow=128, byrow=T)
+beta_mat9 <- matrix(ridge_reg4$beta[,1], nrow=128, byrow=T)
+beta_mat10 <- matrix(ridge_reg5$beta[,1], nrow=128, byrow=T)
+
+# Visualize the Matrix in Grey Scale
+image(t(apply(beta_mat6, 2, rev)), col=grey(seq(0, 1, length=256)), main = "Lambda = 0.000001")
+image(t(apply(beta_mat7, 2, rev)), col=grey(seq(0, 1, length=256)), main = "Lambda = 0.0001")
+image(t(apply(beta_mat8, 2, rev)), col=grey(seq(0, 1, length=256)), main = "0.01")
+image(t(apply(beta_mat9, 2, rev)), col=grey(seq(0, 1, length=256)), main = "0.1")
+image(t(apply(beta_mat10, 2, rev)), col=grey(seq(0, 1, length=256)), main = "1")
+
+```
+
+The ridge model with lambda = 0.1 yielded the best results.
+
+**2b Using the 5 penalty values of λ mentioned above to fit the lasso model. You will have the coefficient β ∈ R 16384. Reshape β into 128 × 128 matrix, and plot the matrix as in the original image. Which coefficient yields the best result? **
+```{r}
+
+#import data
+
+
+
+# Lasso Regression (alpha = 1)
+lasso_reg1 <- glmnet(X_mat, Y_lst, family = "gaussian", intercept = T,
+alpha=1, lambda = 0.000001, lambda.min.ratio = 1e-8,
+standardize = F, nlambda = 1)
+
+lasso_reg2 <- glmnet(X_mat, Y_lst, family = "gaussian", intercept = T,
+alpha=1, lambda = 0.0001, lambda.min.ratio = 1e-8,
+standardize = F, nlambda = 1)
+
+lasso_reg3 <- glmnet(X_mat, Y_lst, family = "gaussian", intercept = T,
+alpha=1, lambda = 0.01, lambda.min.ratio = 1e-8,
+standardize = F, nlambda = 1)
+
+lasso_reg4 <- glmnet(X_mat, Y_lst, family = "gaussian", intercept = T,
+alpha=1, lambda = 0.1, lambda.min.ratio = 1e-8,
+standardize = F, nlambda = 1)
+
+lasso_reg5 <- glmnet(X_mat, Y_lst, family = "gaussian", intercept = T,
+alpha=1, lambda = 1, lambda.min.ratio = 1e-8,
+standardize = F, nlambda = 1)
+
+
+# Reshape Lasso Coefficients to a 128x128 matrix
+beta_mat1 <- matrix(lasso_reg1$beta[,1], nrow=128, byrow=T)
+beta_mat2 <- matrix(lasso_reg2$beta[,1], nrow=128, byrow=T)
+beta_mat3 <- matrix(lasso_reg3$beta[,1], nrow=128, byrow=T)
+beta_mat4 <- matrix(lasso_reg4$beta[,1], nrow=128, byrow=T)
+beta_mat5 <- matrix(lasso_reg5$beta[,1], nrow=128, byrow=T)
+
+
+# Visualize the Matrix in Grey Scale
+image(t(apply(beta_mat1, 2, rev)), col=grey(seq(0, 1, length=256)), main = "Lambda = 0.000001")
+image(t(apply(beta_mat2, 2, rev)), col=grey(seq(0, 1, length=256)), main = "Lambda = 0.0001")
+image(t(apply(beta_mat3, 2, rev)), col=grey(seq(0, 1, length=256)), main = "Lambda = 0.01")
+image(t(apply(beta_mat4, 2, rev)), col=grey(seq(0, 1, length=256)), main = "Lambda = 0.1")
+image(t(apply(beta_mat5, 2, rev)), col=grey(seq(0, 1, length=256)), main = "Lambda = 1")
+
+```
+
+
+
+The Lasso model with Lambda = 0.0001 yielded the best result.
+
+**2c Comparing the best results from lasso and ridge regression respectively, what do you find?**
+
+We notice that the lasso model was able to provide a better image than the ridge model, as the picture is more clear and has less noise. The individual cirlces are clearer compared to the background in the lasso photo. Lasso regression tends to make a lot of coefficients equal to zero, which is useful in situations like this that have lots of noise. This is why in the lasso photo, we do not see as many lines compared to the ridge photo, resulting in a clearer image. 
+
+**Project Question Series 2**
+
+**1. Use the methods discussed in HW session 2 to clean the data. Make sure you are using the cleaned data for all subsequent problems.**
+
+```{r}
+
+
+flights_data <- read.csv("pnwflights14.csv")
+
+# Remove NAs
+flights_data <- na.omit(flights_data)
+
+# Remove nonsense entries 
+flights_data <- flights_data[-which(flights_data$dep_time < 0),]
+flights_data <- flights_data[-which(flights_data$air_time < 0),]
+flights_data <- flights_data[-which(flights_data$distance < 0),]
+```  
+**2. Set X = (dep_time, dep_delay, arr_time) as the predictors and Y = arr_delay as the response variable, formulate a linear regression model to help your instructor to predict the travel time of future trips.**
+
+```{r}
+
+flights_lm <- lm(arr_delay ~ dep_time + dep_delay + arr_time, data = flights_data)
+summary(flights_lm)
+
+```
+
+**3. Apply the regression analysis to get parameter estimation for your proposed models and translate the Y = Xβ equation into plain English so that your instructor can tell her grandma.**
+
+$$ ArrDelay = -1.115e^{-3}DepTime + 9.910e^{-1}DepDelay + 1.494e^{-3}ArrTime -4.609e $$
+
+What our regression equation shows is that increases in Departure Time, Departure Delay and Arrival Time all result in small reductions of the Arrival Delay.
+
+To be more specific, a 1 unit increase in DepTime results in a -1.115e^-3 decrease in ArrDelay, a 1 unit increase in DepDelay results in a 9.910e^-1 decrease in ArrDelay, and a 1 unit increase in ArrTime results in a 1.494e^-3 decrease in ArrDelay.
+
+
+**4. Validate the assumptions behind the linear regression model or diagnose the residuals.**
+
+```{r}
+
+par(mfrow = c(2, 2))
+plot(flights_lm)
+```
+Linearity:
+
+We are able to verify the linearity assumption by looking at the residuals vs the fitted data plot. We see a horizontal red line and thus no pattern between the residuals and the fitted values, indicating a high likelihood of a linear relationship between the predictors and the response variable.
+
+Constant Variance:
+
+We are able to verify the constant varaince assumption by looking at the scale location plot. Again, we see a horizontal red line indicating that the residuals are spread equally among ranges of predictors, demonstrating constant variance.
+
+Normality of residuals:
+
+Our Q-Q plot does not show a perfect straight line, but is is close and thus we can assume normality for this data.
+
+High Leverage:
+
+We are able to see one point on our graph that has leverage of about 0.018, with most of the data being between 0.0 and 0.004. We might consider removing this point in our analysis to not skew results.
+
+Outliers:
+
+```{r}
+
+stdres = rstandard(flights_lm)
+plot(stdres, main = "Standardized Residuals Plot")
+```
+
+From the standardized residual plot, we observe that there are many values with standardized residuals > 3 or < -3. Thus, we can confirm that there are outliers in this data and these should be dealt with to meet the assumptions of regression.  
+
+Influential points:
+
+```{r}
+plot(flights_lm, 4)
+
+```
+
+An observation will be considered influential if Cook's distance > 4/(n-p-1). In this case, that number would be 4/(145459-16-1). There are clearly some influential points in this model.
+
+**5. Try to include more information and formulate another linear regression model.**
+
+```{r}
+
+plot(x = flights_data$dep_delay, y = flights_data$arr_delay)
+plot(x = flights_data$air_time, y = flights_data$arr_delay)
+plot(x = flights_data$arr_time, y = flights_data$arr_delay)
+plot(x = flights_data$dep_time, y = flights_data$arr_delay)
+
+#Explain in the solution
+improved_model <- lm(arr_delay ~ dep_delay + origin + dest + year + month, data = flights_data)
+
+#detect collinearity in the variables
+library(mctest)
+omcdiag(flights_lm)
+imcdiag(flights_lm)
+
+
+#split into test/train
+split <- sort(sample(nrow(flights_data), nrow(flights_data)*0.7))
+train <- flights_data[split,]
+test <- flights_data[-split,]
+
+
+library(caret)
+#to get same results each time
+set.seed(3456)
+
+
+trainIndex <- createDataPartition(flights_data$arr_delay, p = .7,
+                                  list = FALSE,
+                                  times = 1)
+Train <- flights_data[trainIndex,]
+Valid <- flights_data[-trainIndex,]
+
+#run the CV
+CVmodel <- train(
+  arr_delay ~ dep_delay + origin + dest + year + month, data = Train,
+  method = "lm",
+  trControl = trainControl(
+    method = "cv", number = 10
+  )
+)
+
+
+#calculate RMSE
+RMSE_Modelcv <- CVmodel$results$RMSE
+
+#Calculate RMSE of original model
+p <- predict(flights_lm, Valid)
+error <- (p- Valid$arr_time)
+RMSE_Model <- sqrt(mean(error^2))
+
+#Calculate RMSE of improved model no CV
+p <- predict(improved_model, Valid)
+error <- (p- Valid$arr_time)
+RMSE_Model2 <- sqrt(mean(error^2))
+
+```
+
+**6. Which model is the best among your analysis, and give the reason for your choice.**
+
+```{r}
+summary(CVmodel)
+```
+
+Our original analysis in part 4 indicated that there were some outliers and influential points that were affecting the data. Through making some simple scatter plots, I realized that departure delay seemed to be the variable that was most correlated with arrival time, as there appeared to be a very linear relationship between the variables.
+I then made an "improved model" that included departure delay as a predictor of arrival delay, adding in the other variables to account for seasonality. Interestingly, This model actually turned out to have a slightly worse predictive accuracy than the original model (1568 vs 1567.88).
+
+Since the goal of this exercise to be able to accurately predict arrival time, I figured that the best solution would be one where predictive accuracy was maximized, rather than trying to subset the data to meet the assumptions of OLS. I thus decided that using a test/train split could be a good technique, since it would ensure that models were not being overly tuned to the training data. This would minimize the influence of outliers and influential points identified above. My 5 fold CV model greatly increased the predictive accuracy, with an RMSE of 11.69 compared to 1567.88 for the original model. This indicates a much better predictive accuracy of my model, meaning my model is a significant improvement.
